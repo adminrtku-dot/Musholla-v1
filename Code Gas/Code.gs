@@ -131,25 +131,30 @@ function handleRequest_(e) {
         break;
       case 'saveBerita':
         const authBerita = requireAuth_(token);
+        requireWriteAccess_();
         postData.created_by = authBerita.username;
         result = { status: 'success', data: saveBerita(postData) };
         break;
       case 'deleteBerita':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteBerita(params.id || postData.id) };
         break;
       case 'uploadImage':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: uploadImageToDrive(postData.base64Data, postData.filename, postData.mimeType) };
         break;
 
       // === ADMIN: KATEGORI ===
       case 'saveKategori':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveKategori(postData) };
         break;
       case 'deleteKategori':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteKategori(params.id || postData.id) };
         break;
 
@@ -160,87 +165,135 @@ function handleRequest_(e) {
         break;
       case 'updateKomentarStatus':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: updateKomentarStatus(postData.id, postData.status) };
         break;
       case 'deleteKomentar':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteKomentar(params.id || postData.id) };
         break;
 
       // === ADMIN: KEUANGAN ===
       case 'saveKeuangan':
         const authKeu = requireAuth_(token);
+        requireWriteAccess_();
         postData.created_by = authKeu.username;
         result = { status: 'success', data: saveKeuangan(postData) };
         break;
       case 'deleteKeuangan':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteKeuangan(postData.id, postData.year) };
         break;
 
       // === ADMIN: INFAQ ===
       case 'saveInfaqProgram':
         const authInfaq = requireAuth_(token);
+        requireWriteAccess_();
         postData.created_by = authInfaq.username;
         result = { status: 'success', data: saveInfaqProgram(postData) };
         break;
       case 'deleteInfaqProgram':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteInfaqProgram(params.id || postData.id) };
         break;
       case 'saveInfaqDonasi':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveInfaqDonasi(postData) };
         break;
       case 'deleteInfaqDonasi':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteInfaqDonasi(postData.id, postData.programId) };
         break;
 
       // === ADMIN: RAMADHAN ===
       case 'saveRamadhanProgram':
         const authRam = requireAuth_(token);
+        requireWriteAccess_();
         postData.created_by = authRam.username;
         result = { status: 'success', data: saveRamadhanProgram(postData) };
         break;
       case 'deleteRamadhanProgram':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteRamadhanProgram(params.id || postData.id) };
         break;
       case 'saveRamadhanPemasukan':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveRamadhanPemasukan(postData) };
         break;
       case 'deleteRamadhanPemasukan':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteRamadhanPemasukan(postData.id) };
         break;
       case 'saveRamadhanPengeluaran':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveRamadhanPengeluaran(postData) };
         break;
       case 'deleteRamadhanPengeluaran':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteRamadhanPengeluaran(postData.id) };
         break;
 
       // === ADMIN: QURBAN ===
       case 'saveQurbanProgram':
         const authQur = requireAuth_(token);
+        requireWriteAccess_();
         postData.created_by = authQur.username;
         result = { status: 'success', data: saveQurbanProgram(postData) };
         break;
       case 'deleteQurbanProgram':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteQurbanProgram(params.id || postData.id) };
         break;
       case 'saveQurbanPeserta':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveQurbanPeserta(postData) };
         break;
       case 'deleteQurbanPeserta':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteQurbanPeserta(postData.id) };
+        break;
+
+      // === PUBLIC: PROGRAM MUSTAHIQ & BELANJA ===
+      case 'getProgramMustahiq':
+        result = { status: 'success', data: getProgramMustahiq(params.type, params.programId) };
+        break;
+      case 'getProgramBelanja':
+        result = { status: 'success', data: getProgramBelanja(params.type, params.programId) };
+        break;
+
+      // === ADMIN: PROGRAM MUSTAHIQ & BELANJA ===
+      case 'saveProgramMustahiq':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: saveProgramMustahiq(postData) };
+        break;
+      case 'deleteProgramMustahiq':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteProgramMustahiq(postData.id, postData.type) };
+        break;
+      case 'saveProgramBelanja':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: saveProgramBelanja(postData) };
+        break;
+      case 'deleteProgramBelanja':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteProgramBelanja(postData.id, postData.type) };
         break;
 
       // === ADMIN: USERS ===
@@ -250,11 +303,110 @@ function handleRequest_(e) {
         break;
       case 'saveUser':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveUser(postData) };
         break;
       case 'deleteUser':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: deleteUser(params.id || postData.id) };
+        break;
+
+      // === PUBLIC: KAJIAN & JUMAT ===
+      case 'getKajianAktif':
+        result = { status: 'success', data: getKajianAktif() };
+        break;
+      case 'getJumatTerdekat':
+        result = { status: 'success', data: getJumatTerdekat() };
+        break;
+
+      // === PUBLIC: MENU ===
+      case 'getPublicMenu':
+        result = { status: 'success', data: getPublicMenu() };
+        break;
+
+      // === ADMIN: KAJIAN ===
+      case 'getKajianList':
+        requireAuth_(token);
+        result = { status: 'success', data: getKajianList() };
+        break;
+      case 'saveKajian':
+        const authKajian = requireAuth_(token);
+        requireWriteAccess_();
+        postData.created_by = authKajian.username;
+        result = { status: 'success', data: saveKajian(postData) };
+        break;
+      case 'deleteKajian':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteKajian(params.id || postData.id) };
+        break;
+
+      // === ADMIN: JUMAT ===
+      case 'getJumatList':
+        requireAuth_(token);
+        result = { status: 'success', data: getJumatList() };
+        break;
+      case 'saveJumat':
+        const authJumat = requireAuth_(token);
+        requireWriteAccess_();
+        postData.created_by = authJumat.username;
+        result = { status: 'success', data: saveJumat(postData) };
+        break;
+      case 'deleteJumat':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteJumat(params.id || postData.id) };
+        break;
+
+      // === ADMIN: INVENTARIS ===
+      case 'getInventarisList':
+        requireAuth_(token);
+        result = { status: 'success', data: getInventarisList() };
+        break;
+      case 'saveInventaris':
+        const authInv = requireAuth_(token);
+        requireWriteAccess_();
+        postData.created_by = authInv.username;
+        result = { status: 'success', data: saveInventaris(postData) };
+        break;
+      case 'deleteInventaris':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteInventaris(params.id || postData.id) };
+        break;
+
+      // === ADMIN: MUSTAHIQ ===
+      case 'getMustahiqList':
+        requireAuth_(token);
+        result = { status: 'success', data: getMustahiqList() };
+        break;
+      case 'saveMustahiq':
+        const authMust = requireAuth_(token);
+        requireWriteAccess_();
+        postData.created_by = authMust.username;
+        result = { status: 'success', data: saveMustahiq(postData) };
+        break;
+      case 'deleteMustahiq':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteMustahiq(params.id || postData.id) };
+        break;
+
+      // === ADMIN: MENU ===
+      case 'getMenuList':
+        requireAuth_(token);
+        result = { status: 'success', data: getMenuList() };
+        break;
+      case 'saveMenu':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: saveMenu(postData) };
+        break;
+      case 'deleteMenu':
+        requireAuth_(token);
+        requireWriteAccess_();
+        result = { status: 'success', data: deleteMenu(params.id || postData.id) };
         break;
 
       // === ADMIN: CONFIG ===
@@ -264,6 +416,7 @@ function handleRequest_(e) {
         break;
       case 'saveConfig':
         requireAuth_(token);
+        requireWriteAccess_();
         result = { status: 'success', data: saveConfig(postData.config || postData) };
         break;
 
@@ -291,6 +444,17 @@ function handleRequest_(e) {
 }
 
 // ==================== AUTH HANDLERS ====================
+
+/**
+ * Cek apakah DEMO_MODE aktif. Jika ya, tolak semua operasi tulis (save/delete/update).
+ * Digunakan agar website demo bisa dilihat tapi tidak bisa diubah datanya.
+ */
+function requireWriteAccess_() {
+  const config = getConfig();
+  if (config.DEMO_MODE === true || config.DEMO_MODE === 'true') {
+    throw new Error('Mode demo aktif. Operasi simpan, ubah, dan hapus dinonaktifkan.');
+  }
+}
 
 function handleLogin_(data) {
   const { username, password } = data;
@@ -330,10 +494,15 @@ function handleGetPublicConfig_() {
     data: {
       NAMA_MASJID: config.NAMA_MASJID,
       LOKASI_MASJID: config.LOKASI_MASJID,
+      LATITUDE: config.LATITUDE,
+      LONGITUDE: config.LONGITUDE,
       IFRAME_PETA: config.IFRAME_PETA,
       PRIMARY_COLOR: config.PRIMARY_COLOR,
       LOGO_URL: config.LOGO_URL,
       QRIS_URL: config.QRIS_URL,
+      DONASI_TEXT: config.DONASI_TEXT || '',
+      DEMO_MODE: config.DEMO_MODE || false,
+      IS_MASJID: config.IS_MASJID !== false,
       APP_VERSION: APP_CONFIG.APP_VERSION
     }
   };

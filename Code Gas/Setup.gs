@@ -23,6 +23,18 @@ function enableSetup() {
   Logger.log('✅ Setup telah diaktifkan kembali.');
 }
 
+/**
+ * Jalankan fungsi ini untuk membuat sheet Menu tanpa full setup.
+ * Aman dijalankan berulang — tidak akan duplikat.
+ */
+function createMenuSheet() {
+  const config = getConfig();
+  if (!config.SHEET_BERITA_ID) throw new Error('Config SHEET_BERITA_ID belum diset. Jalankan runSetup() dulu.');
+  const ss = SpreadsheetApp.openById(config.SHEET_BERITA_ID);
+  setupMenuSheet_(ss);
+  Logger.log('✅ Sheet Menu berhasil dibuat/diverifikasi.');
+}
+
 // ============================================
 // HELPER: getOrCreate (anti duplikat)
 // ============================================
@@ -69,23 +81,33 @@ function runSetup() {
   const ssInfaq = getOrCreateSpreadsheet_('Infaq Khusus Masjid', rootFolder);
   const ssRamadhan = getOrCreateSpreadsheet_('Ramadhan Masjid', rootFolder);
   const ssQurban = getOrCreateSpreadsheet_('Qurban Masjid', rootFolder);
+  const ssKegiatan = getOrCreateSpreadsheet_('Kegiatan Masjid', rootFolder);
+  const ssInventaris = getOrCreateSpreadsheet_('Inventaris Masjid', rootFolder);
 
   // 3. Setup sheets & dummy data hanya jika spreadsheet masih kosong
   if (isSpreadsheetEmpty_(ssBerita)) setupBeritaSheets_(ssBerita);
+  setupMenuSheet_(ssBerita); // Menu sheet — always ensure exists
   if (isSpreadsheetEmpty_(ssKeuangan)) setupKeuanganSheets_(ssKeuangan);
   if (isSpreadsheetEmpty_(ssInfaq)) setupInfaqSheets_(ssInfaq);
   if (isSpreadsheetEmpty_(ssRamadhan)) setupRamadhanSheets_(ssRamadhan);
   if (isSpreadsheetEmpty_(ssQurban)) setupQurbanSheets_(ssQurban);
+  if (isSpreadsheetEmpty_(ssKegiatan)) setupKegiatanSheets_(ssKegiatan);
+  if (isSpreadsheetEmpty_(ssInventaris)) setupInventarisSheets_(ssInventaris);
 
   // 4. Save config
-  const configData = {
-    ...DEFAULT_CONFIG,
+  const existingConfigStr = props.getProperty('APP_CONFIG');
+  let configData = existingConfigStr ? JSON.parse(existingConfigStr) : { ...DEFAULT_CONFIG };
+
+  configData = {
+    ...configData,
     DRIVE_FOLDER_ID: rootFolder.getId(),
     SHEET_BERITA_ID: ssBerita.getId(),
     SHEET_KEUANGAN_ID: ssKeuangan.getId(),
     SHEET_INFAQ_ID: ssInfaq.getId(),
     SHEET_RAMADHAN_ID: ssRamadhan.getId(),
     SHEET_QURBAN_ID: ssQurban.getId(),
+    SHEET_KEGIATAN_ID: ssKegiatan.getId(),
+    SHEET_INVENTARIS_ID: ssInventaris.getId(),
   };
 
   props.setProperty('APP_CONFIG', JSON.stringify(configData));
@@ -100,6 +122,8 @@ function runSetup() {
       SHEET_INFAQ_ID: ssInfaq.getId(),
       SHEET_RAMADHAN_ID: ssRamadhan.getId(),
       SHEET_QURBAN_ID: ssQurban.getId(),
+      SHEET_KEGIATAN_ID: ssKegiatan.getId(),
+      SHEET_INVENTARIS_ID: ssInventaris.getId(),
     },
     credentials: {
       username: 'masjid',
@@ -308,4 +332,82 @@ function setupQurbanSheets_(ss) {
   sPeserta.appendRow(['qp024', 'qrb001', 'Ibu Risma', 3500000, 4, '2026-04-10', 'admin', now]);
   sPeserta.appendRow(['qp025', 'qrb001', 'Keluarga Bpk. Roni', 3500000, 4, '2026-04-11', 'admin', now]);
   sPeserta.appendRow(['qp026', 'qrb001', 'Bpk. Yudi', 3500000, 4, '2026-04-12', 'admin', now]);
+}
+
+// ============================================
+// SETUP KEGIATAN SHEETS (Kajian + Jumat)
+// ============================================
+function setupKegiatanSheets_(ss) {
+  const now = new Date().toISOString();
+
+  // Sheet: Kajian
+  const sKajian = ss.getActiveSheet();
+  sKajian.setName('Kajian');
+  sKajian.appendRow(['id', 'judul', 'pemateri', 'tanggal', 'waktu', 'tempat', 'deskripsi', 'status', 'created_by', 'created_at']);
+  sKajian.getRange(1, 1, 1, 10).setFontWeight('bold');
+  sKajian.appendRow(['kaj001', 'Kajian Fiqih Ibadah', 'Ust. Ahmad Fauzi', '2026-04-14', 'Ba\'da Maghrib', 'Lantai 1 Masjid', 'Pembahasan tentang tata cara sholat yang benar sesuai sunnah.', 'rutin', 'admin', now]);
+  sKajian.appendRow(['kaj002', 'Tafsir Al-Quran Surah Al-Baqarah', 'Ust. Muhammad Rizki', '2026-04-16', 'Ba\'da Subuh', 'Aula Masjid', 'Kajian tafsir mendalam surah Al-Baqarah ayat 1-20.', 'upcoming', 'admin', now]);
+  sKajian.appendRow(['kaj003', 'Sirah Nabawiyah: Perang Badr', 'Ust. Hasan Basri', '2026-04-18', 'Ba\'da Isya', 'Lantai 2 Masjid', 'Mempelajari sejarah perang Badr dan hikmah di baliknya.', 'upcoming', 'admin', now]);
+  sKajian.appendRow(['kaj004', 'Tabligh Akbar: Menuju Ramadhan Berkah', 'Habib Ali Zainal Abidin', '2026-04-25', '09:00 - 12:00', 'Halaman Masjid', 'Acara tabligh akbar menyambut bulan suci Ramadhan.', 'upcoming', 'admin', now]);
+
+  // Sheet: Jumat
+  const sJumat = ss.insertSheet('Jumat');
+  sJumat.appendRow(['id', 'tanggal', 'khotib', 'imam', 'muadzin', 'tema', 'created_by', 'created_at']);
+  sJumat.getRange(1, 1, 1, 8).setFontWeight('bold');
+  sJumat.appendRow(['jum001', '2026-04-17', 'Ust. Ahmad Fauzi', 'Ust. Muhammad Rizki', 'Bpk. Soleh', 'Keutamaan Sedekah', 'admin', now]);
+  sJumat.appendRow(['jum002', '2026-04-10', 'Ust. Hasan Basri', 'Ust. Ahmad Fauzi', 'Bpk. Yudi', 'Menjaga Lisan di Era Digital', 'admin', now]);
+  sJumat.appendRow(['jum003', '2026-04-03', 'KH. Abdul Somad', 'Ust. Hasan Basri', 'Bpk. Arif', 'Persiapan Menyambut Ramadhan', 'admin', now]);
+}
+
+// ============================================
+// SETUP INVENTARIS & MUSTAHIQ SHEETS
+// ============================================
+function setupInventarisSheets_(ss) {
+  const now = new Date().toISOString();
+
+  // Sheet: Inventaris
+  const sInv = ss.getActiveSheet();
+  sInv.setName('Inventaris');
+  sInv.appendRow(['id', 'nama_barang', 'jumlah', 'kondisi', 'lokasi', 'tanggal_pembelian', 'harga', 'keterangan', 'created_by', 'created_at']);
+  sInv.getRange(1, 1, 1, 10).setFontWeight('bold');
+  sInv.appendRow(['inv001', 'AC Split 2 PK', 4, 'Baik', 'Ruang Utama Lantai 1', '2025-06-15', 8500000, 'Merk Daikin, garansi sampai 2028', 'admin', now]);
+  sInv.appendRow(['inv002', 'Sound System + Mixer', 1, 'Baik', 'Ruang Operator', '2024-01-20', 15000000, 'TOA ZS-1030, mixer Yamaha MG10', 'admin', now]);
+  sInv.appendRow(['inv003', 'Karpet Sajadah (per lembar)', 50, 'Baik', 'Ruang Sholat Utama', '2025-03-10', 350000, 'Karpet Turki import, ukuran 1x2m', 'admin', now]);
+  sInv.appendRow(['inv004', 'Kursi Roda', 2, 'Baik', 'Gudang', '2023-08-05', 1200000, 'Untuk jamaah lansia/disabilitas', 'admin', now]);
+  sInv.appendRow(['inv005', 'Genset 5000W', 1, 'Perlu Service', 'Belakang Masjid', '2022-11-20', 12000000, 'Karburator perlu dibersihkan', 'admin', now]);
+  sInv.appendRow(['inv006', 'Proyektor + Layar', 1, 'Baik', 'Aula Lantai 2', '2025-01-08', 7500000, 'Epson EB-X51, layar tripod 96 inch', 'admin', now]);
+
+  // Sheet: Mustahiq
+  const sMust = ss.insertSheet('Mustahiq');
+  sMust.appendRow(['id', 'nama', 'alamat', 'kategori_asnaf', 'no_hp', 'jumlah_bantuan', 'tanggal_terakhir', 'keterangan', 'status', 'created_by', 'created_at']);
+  sMust.getRange(1, 1, 1, 11).setFontWeight('bold');
+  sMust.appendRow(['mst001', 'Ibu Siti Aisyah', 'Jl. Melati No. 5 RT 03/RW 02', 'Fakir', '081234567890', 500000, '2026-03-15', 'Janda, 3 anak masih sekolah', 'aktif', 'admin', now]);
+  sMust.appendRow(['mst002', 'Bpk. Udin Saepudin', 'Jl. Kenanga No. 12 RT 01/RW 04', 'Miskin', '081298765432', 350000, '2026-03-15', 'Buruh harian lepas, 2 anak', 'aktif', 'admin', now]);
+  sMust.appendRow(['mst003', 'Ibu Mariam', 'Jl. Dahlia No. 8 RT 05/RW 01', 'Fakir', '082112345678', 500000, '2026-02-20', 'Lansia, tinggal sendiri', 'aktif', 'admin', now]);
+  sMust.appendRow(['mst004', 'Anak Yatim - Keluarga Alm. H. Rasyid', 'Jl. Mawar No. 3 RT 02/RW 03', 'Fakir', '089876543210', 750000, '2026-03-15', '4 anak yatim, ibu sebagai pembantu', 'aktif', 'admin', now]);
+  sMust.appendRow(['mst005', 'Bpk. Abdul Karim', 'Jl. Anggrek No. 15 RT 04/RW 02', 'Gharimin', '081345678901', 1000000, '2026-01-10', 'Terlilit hutang karena sakit berkepanjangan', 'nonaktif', 'admin', now]);
+}
+
+// ============================================
+// SETUP MENU SHEET (Navigation menu for public site)
+// ============================================
+function setupMenuSheet_(ss) {
+  // Only create if sheet doesn't exist yet
+  if (ss.getSheetByName('Menu')) return;
+
+  const now = new Date().toISOString();
+  const sMenu = ss.insertSheet('Menu');
+  sMenu.appendRow(['id', 'nama', 'link', 'icon', 'urutan', 'tampil', 'tipe', 'parent_id', 'created_at']);
+  sMenu.getRange(1, 1, 1, 9).setFontWeight('bold');
+
+  // Default menu items matching current hardcoded navbar
+  var programId = 'menu_program';
+  sMenu.appendRow(['menu_beranda', 'Beranda', '/', 'bi-house', 1, true, 'item', '', now]);
+  sMenu.appendRow(['menu_berita', 'Berita', '/berita', 'bi-newspaper', 2, true, 'item', '', now]);
+  sMenu.appendRow(['menu_keuangan', 'Keuangan', '/laporan', 'bi-graph-up', 3, true, 'item', '', now]);
+  sMenu.appendRow(['menu_zakat', 'Zakat', '/zakat', 'bi-calculator', 4, true, 'item', '', now]);
+  sMenu.appendRow([programId, 'Program', '#', 'bi-collection', 5, true, 'dropdown', '', now]);
+  sMenu.appendRow(['menu_infaq', 'Infaq / Bantuan', '/infaq', 'bi-hand-thumbs-up', 1, true, 'child', programId, now]);
+  sMenu.appendRow(['menu_ramadhan', 'Ramadhan', '/ramadhan', 'bi-moon-stars', 2, true, 'child', programId, now]);
+  sMenu.appendRow(['menu_qurban', 'Qurban', '/qurban', 'bi-shop', 3, true, 'child', programId, now]);
 }

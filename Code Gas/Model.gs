@@ -33,6 +33,14 @@ function findRowIndex_(sheet, id) {
   return -1;
 }
 
+function ensureColumn_(sheet, colName) {
+  if (!sheet || sheet.getLastRow() < 1) return;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf(colName) === -1) {
+    sheet.getRange(1, headers.length + 1).setValue(colName);
+  }
+}
+
 // ==================== BERITA MODEL ====================
 
 function getBeritaList(kategori, page, limit) {
@@ -311,18 +319,22 @@ function saveInfaqProgram(data) {
   const sheet = getSheet_(config.SHEET_INFAQ_ID, 'Program');
   const now = new Date().toISOString();
   
+  // Dynamic column: qris_url
+  ensureColumn_(sheet, 'qris_url');
+  
   if (data.id) {
     const rowIdx = findRowIndex_(sheet, data.id);
     if (rowIdx === -1) throw new Error('Program not found');
-    sheet.getRange(rowIdx, 2).setValue(data.judul);
-    sheet.getRange(rowIdx, 3).setValue(data.deskripsi || '');
-    sheet.getRange(rowIdx, 4).setValue(Number(data.target) || 0);
-    sheet.getRange(rowIdx, 6).setValue(data.status || 'active');
-    sheet.getRange(rowIdx, 8).setValue(now);
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers.forEach((h, i) => {
+      if (h === 'id' || h === 'created_at' || h === 'created_by' || h === 'terkumpul') return;
+      if (h === 'updated_at') { sheet.getRange(rowIdx, i + 1).setValue(now); return; }
+      if (data[h] !== undefined) sheet.getRange(rowIdx, i + 1).setValue(h === 'target' ? Number(data[h]) || 0 : data[h]);
+    });
     return data;
   } else {
     const id = generateId_();
-    sheet.appendRow([id, data.judul, data.deskripsi || '', Number(data.target) || 0, 0, 'active', data.created_by || 'admin', now, now]);
+    sheet.appendRow([id, data.judul, data.deskripsi || '', Number(data.target) || 0, 0, 'active', data.created_by || 'admin', now, now, data.qris_url || '']);
     return { id, ...data };
   }
 }
@@ -403,16 +415,21 @@ function saveRamadhanProgram(data) {
   const sheet = getSheet_(config.SHEET_RAMADHAN_ID, 'Program');
   const now = new Date().toISOString();
   
+  // Dynamic column: qris_url
+  ensureColumn_(sheet, 'qris_url');
+  
   if (data.id) {
     const rowIdx = findRowIndex_(sheet, data.id);
     if (rowIdx === -1) throw new Error('Program not found');
-    sheet.getRange(rowIdx, 2).setValue(data.judul);
-    sheet.getRange(rowIdx, 3).setValue(data.tahun);
-    sheet.getRange(rowIdx, 4).setValue(data.status || 'active');
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers.forEach((h, i) => {
+      if (h === 'id' || h === 'created_at' || h === 'created_by') return;
+      if (data[h] !== undefined) sheet.getRange(rowIdx, i + 1).setValue(data[h]);
+    });
     return data;
   } else {
     const id = generateId_();
-    sheet.appendRow([id, data.judul, data.tahun || new Date().getFullYear(), 'active', data.created_by || 'admin', now]);
+    sheet.appendRow([id, data.judul, data.tahun || new Date().getFullYear(), 'active', data.created_by || 'admin', now, data.qris_url || '']);
     return { id, ...data };
   }
 }
@@ -514,17 +531,21 @@ function saveQurbanProgram(data) {
   const sheet = getSheet_(config.SHEET_QURBAN_ID, 'Program');
   const now = new Date().toISOString();
   
+  // Dynamic column: qris_url
+  ensureColumn_(sheet, 'qris_url');
+  
   if (data.id) {
     const rowIdx = findRowIndex_(sheet, data.id);
     if (rowIdx === -1) throw new Error('Program not found');
-    sheet.getRange(rowIdx, 2).setValue(data.judul);
-    sheet.getRange(rowIdx, 3).setValue(data.tahun);
-    sheet.getRange(rowIdx, 4).setValue(data.tanggal_qurban || '');
-    sheet.getRange(rowIdx, 5).setValue(data.status || 'active');
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers.forEach((h, i) => {
+      if (h === 'id' || h === 'created_at' || h === 'created_by') return;
+      if (data[h] !== undefined) sheet.getRange(rowIdx, i + 1).setValue(data[h]);
+    });
     return data;
   } else {
     const id = generateId_();
-    sheet.appendRow([id, data.judul, data.tahun || new Date().getFullYear(), data.tanggal_qurban || '', 'active', data.created_by || 'admin', now]);
+    sheet.appendRow([id, data.judul, data.tahun || new Date().getFullYear(), data.tanggal_qurban || '', 'active', data.created_by || 'admin', now, data.qris_url || '']);
     return { id, ...data };
   }
 }
@@ -576,6 +597,112 @@ function deleteQurbanPeserta(id) {
   return true;
 }
 
+// ==================== PROGRAM MUSTAHIQ MODEL ====================
+// Generic per-program mustahiq (penerima bantuan) for infaq/ramadhan/qurban
+
+function getSheetIdByType_(type) {
+  const config = getConfig();
+  if (type === 'infaq') return config.SHEET_INFAQ_ID;
+  if (type === 'ramadhan') return config.SHEET_RAMADHAN_ID;
+  if (type === 'qurban') return config.SHEET_QURBAN_ID;
+  throw new Error('Unknown program type: ' + type);
+}
+
+function ensureSheetExists_(ssId, sheetName, headers) {
+  const ss = SpreadsheetApp.openById(ssId);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(headers);
+  }
+  return sheet;
+}
+
+function getProgramMustahiq(type, programId) {
+  const ssId = getSheetIdByType_(type);
+  const sheet = getSheet_(ssId, 'Mustahiq');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet)
+    .filter(d => String(d.program_id) === String(programId))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function saveProgramMustahiq(data) {
+  const ssId = getSheetIdByType_(data.type);
+  const sheet = ensureSheetExists_(ssId, 'Mustahiq', ['id', 'program_id', 'nama', 'nominal', 'alamat', 'keterangan', 'admin_input', 'created_at']);
+  ensureColumn_(sheet, 'nominal');
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Mustahiq not found');
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers.forEach((h, i) => {
+      if (h === 'id' || h === 'program_id' || h === 'admin_input' || h === 'created_at') return;
+      if (h === 'nominal' && data[h] !== undefined) { sheet.getRange(rowIdx, i + 1).setValue(Number(data[h]) || 0); return; }
+      if (data[h] !== undefined) sheet.getRange(rowIdx, i + 1).setValue(data[h]);
+    });
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.program_id, data.nama, Number(data.nominal) || 0, data.alamat || '', data.keterangan || '', data.admin_input || 'admin', now]);
+    return { id, ...data, created_at: now };
+  }
+}
+
+function deleteProgramMustahiq(id, type) {
+  const ssId = getSheetIdByType_(type);
+  const sheet = getSheet_(ssId, 'Mustahiq');
+  if (!sheet) throw new Error('Sheet not found');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Mustahiq not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== PROGRAM BELANJA MODEL ====================
+// Generic per-program belanja/pembelian for infaq/ramadhan/qurban
+
+function getProgramBelanja(type, programId) {
+  const ssId = getSheetIdByType_(type);
+  const sheet = getSheet_(ssId, 'Belanja');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet)
+    .filter(d => String(d.program_id) === String(programId))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function saveProgramBelanja(data) {
+  const ssId = getSheetIdByType_(data.type);
+  const sheet = ensureSheetExists_(ssId, 'Belanja', ['id', 'program_id', 'nama_barang', 'jumlah', 'qty', 'keterangan', 'tanggal', 'admin_input', 'created_at']);
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Belanja not found');
+    sheet.getRange(rowIdx, 3).setValue(data.nama_barang);
+    sheet.getRange(rowIdx, 4).setValue(Number(data.jumlah) || 0);
+    sheet.getRange(rowIdx, 5).setValue(Number(data.qty) || 1);
+    sheet.getRange(rowIdx, 6).setValue(data.keterangan || '');
+    sheet.getRange(rowIdx, 7).setValue(data.tanggal);
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.program_id, data.nama_barang, Number(data.jumlah) || 0, Number(data.qty) || 1, data.keterangan || '', data.tanggal || now.split('T')[0], data.admin_input || 'admin', now]);
+    return { id, ...data, created_at: now };
+  }
+}
+
+function deleteProgramBelanja(id, type) {
+  const ssId = getSheetIdByType_(type);
+  const sheet = getSheet_(ssId, 'Belanja');
+  if (!sheet) throw new Error('Sheet not found');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Belanja not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
 // ==================== USERS MODEL ====================
 
 function getUsers() {
@@ -615,5 +742,291 @@ function deleteUser(id) {
   const rowIdx = findRowIndex_(sheet, id);
   if (rowIdx === -1) throw new Error('User not found');
   sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== KAJIAN / KEGIATAN MODEL ====================
+
+function getKajianList() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Kajian');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+}
+
+function getKajianAktif() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Kajian');
+  if (!sheet) return [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return sheetToObjects_(sheet)
+    .filter(k => {
+      const tgl = new Date(k.tanggal);
+      tgl.setHours(0, 0, 0, 0);
+      return tgl >= now || k.status === 'rutin';
+    })
+    .sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+}
+
+function saveKajian(data) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Kajian');
+  const now = new Date().toISOString();
+
+  // Handle poster column if it doesn't exist yet
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  let posterIdx = headers.indexOf('poster') + 1;
+  if (posterIdx === 0) {
+    posterIdx = headers.length + 1;
+    sheet.getRange(1, posterIdx).setValue('poster');
+  }
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Kajian not found');
+    sheet.getRange(rowIdx, 2).setValue(data.judul);
+    sheet.getRange(rowIdx, 3).setValue(data.pemateri);
+    sheet.getRange(rowIdx, 4).setValue(data.tanggal);
+    sheet.getRange(rowIdx, 5).setValue(data.waktu || '');
+    sheet.getRange(rowIdx, 6).setValue(data.tempat || '');
+    sheet.getRange(rowIdx, 7).setValue(data.deskripsi || '');
+    sheet.getRange(rowIdx, 8).setValue(data.status || 'upcoming');
+    sheet.getRange(rowIdx, posterIdx).setValue(data.poster || '');
+    return data;
+  } else {
+    const id = generateId_();
+    
+    // Create an empty row of the right size
+    const newRow = new Array(posterIdx).fill('');
+    newRow[0] = id;
+    newRow[1] = data.judul;
+    newRow[2] = data.pemateri;
+    newRow[3] = data.tanggal;
+    newRow[4] = data.waktu || '';
+    newRow[5] = data.tempat || '';
+    newRow[6] = data.deskripsi || '';
+    newRow[7] = data.status || 'upcoming';
+    newRow[8] = data.created_by || 'admin';
+    newRow[9] = now;
+    newRow[posterIdx - 1] = data.poster || '';
+    
+    sheet.appendRow(newRow);
+    return { id, ...data };
+  }
+}
+
+function deleteKajian(id) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Kajian');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Kajian not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== JUMAT (PETUGAS SHOLAT JUMAT) MODEL ====================
+
+function getJumatList() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Jumat');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+}
+
+function getJumatTerdekat() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Jumat');
+  if (!sheet) return null;
+  const items = sheetToObjects_(sheet).sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+  if (items.length === 0) return null;
+  // Return the most recent entry (could be upcoming or last Friday)
+  return items[0];
+}
+
+function saveJumat(data) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Jumat');
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Data Jumat not found');
+    sheet.getRange(rowIdx, 2).setValue(data.tanggal);
+    sheet.getRange(rowIdx, 3).setValue(data.khotib);
+    sheet.getRange(rowIdx, 4).setValue(data.imam);
+    sheet.getRange(rowIdx, 5).setValue(data.muadzin);
+    sheet.getRange(rowIdx, 6).setValue(data.tema || '');
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.tanggal, data.khotib, data.imam, data.muadzin, data.tema || '', data.created_by || 'admin', now]);
+    return { id, ...data };
+  }
+}
+
+function deleteJumat(id) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_KEGIATAN_ID, 'Jumat');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Data Jumat not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== INVENTARIS MODEL ====================
+
+function getInventarisList() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Inventaris');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function saveInventaris(data) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Inventaris');
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Inventaris not found');
+    sheet.getRange(rowIdx, 2).setValue(data.nama_barang);
+    sheet.getRange(rowIdx, 3).setValue(Number(data.jumlah) || 1);
+    sheet.getRange(rowIdx, 4).setValue(data.kondisi || 'Baik');
+    sheet.getRange(rowIdx, 5).setValue(data.lokasi || '');
+    sheet.getRange(rowIdx, 6).setValue(data.tanggal_pembelian || '');
+    sheet.getRange(rowIdx, 7).setValue(Number(data.harga) || 0);
+    sheet.getRange(rowIdx, 8).setValue(data.keterangan || '');
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.nama_barang, Number(data.jumlah) || 1, data.kondisi || 'Baik', data.lokasi || '', data.tanggal_pembelian || '', Number(data.harga) || 0, data.keterangan || '', data.created_by || 'admin', now]);
+    return { id, ...data };
+  }
+}
+
+function deleteInventaris(id) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Inventaris');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Inventaris not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== MUSTAHIQ MODEL ====================
+
+function getMustahiqList() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Mustahiq');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+function saveMustahiq(data) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Mustahiq');
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Mustahiq not found');
+    sheet.getRange(rowIdx, 2).setValue(data.nama);
+    sheet.getRange(rowIdx, 3).setValue(data.alamat || '');
+    sheet.getRange(rowIdx, 4).setValue(data.kategori_asnaf || '');
+    sheet.getRange(rowIdx, 5).setValue(data.no_hp || '');
+    sheet.getRange(rowIdx, 6).setValue(data.jumlah_bantuan || 0);
+    sheet.getRange(rowIdx, 7).setValue(data.tanggal_terakhir || '');
+    sheet.getRange(rowIdx, 8).setValue(data.keterangan || '');
+    sheet.getRange(rowIdx, 9).setValue(data.status || 'aktif');
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.nama, data.alamat || '', data.kategori_asnaf || '', data.no_hp || '', Number(data.jumlah_bantuan) || 0, data.tanggal_terakhir || '', data.keterangan || '', data.status || 'aktif', data.created_by || 'admin', now]);
+    return { id, ...data };
+  }
+}
+
+function deleteMustahiq(id) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_INVENTARIS_ID, 'Mustahiq');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Mustahiq not found');
+  sheet.deleteRow(rowIdx);
+  return true;
+}
+
+// ==================== MENU MODEL ====================
+
+function getMenuList() {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_BERITA_ID, 'Menu');
+  if (!sheet) return [];
+  return sheetToObjects_(sheet).sort((a, b) => Number(a.urutan) - Number(b.urutan));
+}
+
+function getPublicMenu() {
+  const all = getMenuList();
+  const visible = all.filter(m => String(m.tampil) === 'true' || m.tampil === true);
+  
+  // Separate parents and children
+  const parents = visible.filter(m => m.tipe !== 'child').sort((a, b) => Number(a.urutan) - Number(b.urutan));
+  const children = visible.filter(m => m.tipe === 'child');
+  
+  return parents.map(p => {
+    const item = { id: p.id, nama: p.nama, link: p.link, icon: p.icon, urutan: p.urutan, tipe: p.tipe };
+    if (p.tipe === 'dropdown') {
+      item.children = children
+        .filter(c => c.parent_id === p.id)
+        .sort((a, b) => Number(a.urutan) - Number(b.urutan))
+        .map(c => ({ id: c.id, nama: c.nama, link: c.link, icon: c.icon, urutan: c.urutan }));
+    }
+    return item;
+  });
+}
+
+function saveMenu(data) {
+  const config = getConfig();
+  let sheet = getSheet_(config.SHEET_BERITA_ID, 'Menu');
+  if (!sheet) {
+    const ss = SpreadsheetApp.openById(config.SHEET_BERITA_ID);
+    sheet = ss.insertSheet('Menu');
+    sheet.appendRow(['id', 'nama', 'link', 'icon', 'urutan', 'tampil', 'tipe', 'parent_id', 'created_at']);
+  }
+  const now = new Date().toISOString();
+
+  if (data.id) {
+    const rowIdx = findRowIndex_(sheet, data.id);
+    if (rowIdx === -1) throw new Error('Menu not found');
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    headers.forEach((h, i) => {
+      if (h === 'id' || h === 'created_at') return;
+      if (data[h] !== undefined) sheet.getRange(rowIdx, i + 1).setValue(data[h]);
+    });
+    return data;
+  } else {
+    const id = generateId_();
+    sheet.appendRow([id, data.nama || '', data.link || '', data.icon || '', Number(data.urutan) || 0, data.tampil !== false && data.tampil !== 'false', data.tipe || 'item', data.parent_id || '', now]);
+    return { id, ...data };
+  }
+}
+
+function deleteMenu(id) {
+  const config = getConfig();
+  const sheet = getSheet_(config.SHEET_BERITA_ID, 'Menu');
+  const rowIdx = findRowIndex_(sheet, id);
+  if (rowIdx === -1) throw new Error('Menu not found');
+  // Also delete children if this is a dropdown
+  const all = sheetToObjects_(sheet);
+  const childIds = all.filter(m => m.parent_id === id).map(c => c.id);
+  // Delete from bottom to top to avoid row shifting
+  const rowsToDelete = [rowIdx];
+  childIds.forEach(cid => {
+    const cr = findRowIndex_(sheet, cid);
+    if (cr !== -1) rowsToDelete.push(cr);
+  });
+  rowsToDelete.sort((a, b) => b - a);
+  rowsToDelete.forEach(r => sheet.deleteRow(r));
   return true;
 }

@@ -61,7 +61,7 @@ Sebelum melakukan apapun, Anda **wajib** men-deploy kode backend terlebih dahulu
 ### 2. Download / Clone Repository Ini
 
 ```bash
-git clone https://github.com/username/masjidv2.git
+git clone https://github.com/Sebuahhobi/masjid.git
 ```
 
 ### 3. Konfigurasi URL API Backend
