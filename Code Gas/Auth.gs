@@ -78,7 +78,7 @@ function authenticateUser(username, password) {
   
   if (!config.SHEET_BERITA_ID) {
     // Fallback: belum setup, gunakan default
-    if (username === 'masjid' && password === 'indonesia') {
+    if (username === 'musholla' && password === 'indonesia') {
       return {
         id: 'admin-default',
         username: 'masjid',
